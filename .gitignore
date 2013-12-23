@@ -1,0 +1,10 @@
+/bin
+/build
+/lib
+/download
+/temp
+*.jar
+.classpath
+/.settings
+/target
+.DS_Store

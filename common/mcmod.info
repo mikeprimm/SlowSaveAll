@@ -1,0 +1,22 @@
+[
+{
+  "modid": "SlowSaveAll",
+  "name": "SlowSaveAll",
+  "description": "Smooth, lag free autosave",
+  "version": "@VERSION@",
+  "mcversion": "1.6.4",
+  "url": "http://www.westeroscraft.com/",
+  "updateUrl": "",
+  "authors": [
+    "mikeprimm"
+  ],
+  "credits": "Design and code by mikeprimm",
+  "logoFile": "",
+  "screenshots": [ ],
+  "parent":"",
+
+  "dependencies": [
+     "mod_MinecraftForge"
+  ]
+}
+]
