@@ -51,6 +51,7 @@ public class SlowSaveAll
     
     public int savePeriod = 600;
     public int chunksPerTick = 20;
+    public boolean skipPlayers = false;
     
     public boolean tickregistered = false;
     private TickHandler handler = new TickHandler();
@@ -76,6 +77,7 @@ public class SlowSaveAll
             cfg.load();
             savePeriod = cfg.get("Settings", "savePeriod", 600).getInt();
             chunksPerTick = cfg.get("Settings", "chunksPerTick", 20).getInt();
+            skipPlayers = cfg.get("Settings",  "skipPlayers", false).getBoolean(false);
             if (chunksPerTick < 1) chunksPerTick = 1;
             if (savePeriod < 60) savePeriod = 60;
             
@@ -212,14 +214,17 @@ public class SlowSaveAll
                         }
                         chunkIdx = 0;
                         chunkCnt = 0;
-                        log.info("Starting save for world '" + activeWorld.getWorldInfo().getWorldName() + "'");
                         // And save world data
                         try {
-                            saveLevel.invoke(activeWorld, new Object[0]);
+                            if (!skipPlayers) {
+                                log.info("Saving level data for world '" + activeWorld.getWorldInfo().getWorldName() + "'");
+                                saveLevel.invoke(activeWorld, new Object[0]);
+                            }
                         } catch (IllegalArgumentException e) {
                         } catch (IllegalAccessException e) {
                         } catch (InvocationTargetException e) {
                         }
+                        log.info("Staving chunks for world '" + activeWorld.getWorldInfo().getWorldName() + "'");
                         return;
                     }
                     else {
