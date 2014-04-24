@@ -17,7 +17,9 @@ import cpw.mods.fml.common.network.NetworkMod;
 import cpw.mods.fml.common.registry.TickRegistry;
 import cpw.mods.fml.relauncher.Side;
 import net.minecraft.crash.CrashReport;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.management.ServerConfigurationManager;
 import net.minecraft.util.ReportedException;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.Chunk;
@@ -58,6 +60,7 @@ public class SlowSaveAll
     private Method saveChunk = null;
     private Method extraSaveChunkData = null;
     private Method saveLevel = null;
+    private Method writePlayerData = null;
     
     public static void crash(Exception x, String msg) {
         CrashReport crashreport = CrashReport.makeCrashReport(x, msg);
@@ -108,6 +111,8 @@ public class SlowSaveAll
             extraSaveChunkData.setAccessible(true);
             saveChunk = cls.getMethod("func_73242_b", new Class[] { Chunk.class });
             saveChunk.setAccessible(true);
+            writePlayerData = ServerConfigurationManager.class.getMethod("func_72391_b", new Class[] { EntityPlayerMP.class });
+            writePlayerData.setAccessible(true);
         } catch (SecurityException e) {
         } catch (NoSuchMethodException e) {
         }
@@ -151,6 +156,7 @@ public class SlowSaveAll
         private boolean stopped;
         private int ticksUntilSave;
         private List<WorldServer> worldsToDo;
+        private List<EntityPlayerMP> playersToDo;
         private WorldServer activeWorld;
         private int[] chunkX;
         private int[] chunkZ;
@@ -185,6 +191,7 @@ public class SlowSaveAll
             }
             // Process save
             MinecraftServer server = MinecraftServer.getServer();
+            ServerConfigurationManager scm = server.getConfigurationManager();
             // If no world list, start one
             if (worldsToDo == null) {
                 worldsToDo = new ArrayList<WorldServer>();
@@ -195,6 +202,29 @@ public class SlowSaveAll
             // If no active world, find next one
             while (activeWorld == null) {
                 if (worldsToDo.isEmpty()) { // No more?  we're done
+                    if (!skipPlayers) {
+                        if (playersToDo == null) {
+                            playersToDo = new ArrayList<EntityPlayerMP>();
+                            for (Object o : scm.playerEntityList) {
+                                playersToDo.add((EntityPlayerMP) o);
+                            }
+                            log.info("Saving " + playersToDo.size() + " players");
+                        }
+                        if (!playersToDo.isEmpty()) {   // More to do?
+                            EntityPlayerMP p = playersToDo.remove(0);
+                            if (scm.playerEntityList.contains(p)) {    // Still in list?
+                                try {
+                                    writePlayerData.invoke(scm, p);
+                                } catch (IllegalArgumentException e) {
+                                } catch (IllegalAccessException e) {
+                                } catch (InvocationTargetException e) {
+                                }
+                            }
+                            return;
+                        }
+                    }
+                    log.info("Save done");
+                    playersToDo = null;
                     worldsToDo = null;
                     ticksUntilSave = savePeriod * 20;   // Reset timer
                     return;
@@ -216,15 +246,13 @@ public class SlowSaveAll
                         chunkCnt = 0;
                         // And save world data
                         try {
-                            if (!skipPlayers) {
-                                log.info("Saving level data for world '" + activeWorld.getWorldInfo().getWorldName() + "'");
-                                saveLevel.invoke(activeWorld, new Object[0]);
-                            }
+                            log.info("Saving level data for world '" + activeWorld.getWorldInfo().getWorldName() + "'");
+                            saveLevel.invoke(activeWorld, new Object[0]);
                         } catch (IllegalArgumentException e) {
                         } catch (IllegalAccessException e) {
                         } catch (InvocationTargetException e) {
                         }
-                        log.info("Staving chunks for world '" + activeWorld.getWorldInfo().getWorldName() + "'");
+                        log.info("Saving chunks for world '" + activeWorld.getWorldInfo().getWorldName() + "'");
                         return;
                     }
                     else {
