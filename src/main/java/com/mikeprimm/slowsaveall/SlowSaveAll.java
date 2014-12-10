@@ -1,21 +1,19 @@
 package com.mikeprimm.slowsaveall;
 
-import cpw.mods.fml.common.ITickHandler;
+import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.Mod.EventHandler;
 import cpw.mods.fml.common.Mod.Instance;
 import cpw.mods.fml.common.ObfuscationReflectionHelper;
 import cpw.mods.fml.common.SidedProxy;
-import cpw.mods.fml.common.TickType;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartedEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent; 
 import cpw.mods.fml.common.event.FMLServerStoppingEvent;
-import cpw.mods.fml.common.network.NetworkMod;
-import cpw.mods.fml.common.registry.TickRegistry;
-import cpw.mods.fml.relauncher.Side;
+import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import cpw.mods.fml.common.gameevent.TickEvent;
 import net.minecraft.crash.CrashReport;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
@@ -24,19 +22,17 @@ import net.minecraft.util.ReportedException;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.gen.ChunkProviderServer;
-import net.minecraftforge.common.Configuration;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.event.world.WorldEvent;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.logging.Logger;
 
 @Mod(modid = "SlowSaveAll", name = "SlowSaveAll", version = Version.VER)
-@NetworkMod(clientSideRequired = false, serverSideRequired = false)
 public class SlowSaveAll
 {    
     public static Logger log = Logger.getLogger("SlowSaveAll");
@@ -136,7 +132,7 @@ public class SlowSaveAll
         if (saveChunk == null) return;
         /* Register tick handler */
         if(!tickregistered) {
-            TickRegistry.registerTickHandler(handler, Side.SERVER);
+            FMLCommonHandler.instance().bus().register(handler);
             tickregistered = true;
         }
         handler.reset(false);
@@ -152,7 +148,7 @@ public class SlowSaveAll
         }
     }    
     
-    private class TickHandler implements ITickHandler {
+    private class TickHandler {
         private boolean stopped;
         private int ticksUntilSave;
         private List<WorldServer> worldsToDo;
@@ -171,18 +167,10 @@ public class SlowSaveAll
             chunkIdx = 0;
             chunkCnt = 0;
         }
-        @Override
-        public String getLabel() {
-            return "SlowSaveAll";
-        }
 
-        @Override
-        public void tickEnd(EnumSet<TickType> type, Object... arg1) {
+        @SubscribeEvent
+        public void tickEvent(TickEvent.ServerTickEvent event)  {
             if (stopped) return;
-            // Ignore non-server ticks
-            if (!type.contains(TickType.SERVER)) {
-                return;
-            }
             if (ticksUntilSave > 0) {   // Still ticking?
                 ticksUntilSave--;
                 if (ticksUntilSave > 0) {
@@ -261,8 +249,8 @@ public class SlowSaveAll
                 }
             }
             // Process active world
-            boolean flag = activeWorld.canNotSave;
-            activeWorld.canNotSave = false;
+            boolean flag = activeWorld.levelSaving;
+            activeWorld.levelSaving = false;    // False=enabled (bad name for field in 1.7.x)
             for (int i = 0; (i < chunksPerTick) && (chunkIdx < chunkX.length); chunkIdx++) {
                 if (activeWorld.theChunkProviderServer.chunkExists(chunkX[chunkIdx], chunkZ[chunkIdx])) {   // If still loaded
                     Chunk c = activeWorld.getChunkFromChunkCoords(chunkX[chunkIdx], chunkZ[chunkIdx]);
@@ -279,7 +267,7 @@ public class SlowSaveAll
                     i++;
                 }
             }
-            activeWorld.canNotSave = flag;  // Restore save state
+            activeWorld.levelSaving = flag;  // Restore save state
             
             if (chunkIdx >= chunkX.length) { // Done?
                 MinecraftForge.EVENT_BUS.post(new WorldEvent.Save(activeWorld));
@@ -288,17 +276,6 @@ public class SlowSaveAll
                 chunkX = chunkZ = null;
                 chunkIdx = 0;
             }
-        }
-
-        @Override
-        public void tickStart(EnumSet<TickType> arg0, Object... arg1) {
-        }
-
-        private final EnumSet<TickType> ticktype = EnumSet.of(TickType.SERVER);
-        
-        @Override
-        public EnumSet<TickType> ticks() {
-            return ticktype;
         }
     }
 }
