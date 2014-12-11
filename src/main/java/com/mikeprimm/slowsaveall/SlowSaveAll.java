@@ -14,6 +14,8 @@ import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.event.FMLServerStoppingEvent;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
+import cpw.mods.fml.common.network.NetworkCheckHandler;
+import cpw.mods.fml.relauncher.Side;
 import net.minecraft.crash.CrashReport;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
@@ -30,6 +32,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 @Mod(modid = "SlowSaveAll", name = "SlowSaveAll", version = Version.VER)
@@ -55,6 +58,7 @@ public class SlowSaveAll
     public boolean tickregistered = false;
     private TickHandler handler = new TickHandler();
     private Method saveLevel = null;
+    private Method writePlayerData = null;
     
     public static void crash(Exception x, String msg) {
         CrashReport crashreport = CrashReport.makeCrashReport(x, msg);
@@ -101,6 +105,8 @@ public class SlowSaveAll
             return;
         }
         try {
+            writePlayerData = ServerConfigurationManager.class.getDeclaredMethod("func_72391_b", new Class[] { EntityPlayerMP.class });
+            writePlayerData.setAccessible(true);
             saveLevel = WorldServer.class.getDeclaredMethod("func_73042_a", new Class[0]);
             saveLevel.setAccessible(true);
         } catch (SecurityException e) {
@@ -199,7 +205,12 @@ public class SlowSaveAll
                         if (!playersToDo.isEmpty()) {   // More to do?
                             EntityPlayerMP p = playersToDo.remove(0);
                             if (scm.playerEntityList.contains(p)) {    // Still in list?
-                                scm.writePlayerData(p);
+                                try {
+                                    writePlayerData.invoke(scm, p);
+                                } catch (IllegalArgumentException e) {
+                                } catch (IllegalAccessException e) {
+                                } catch (InvocationTargetException e) {
+                                }
                             }
                             return;
                         }
@@ -274,5 +285,9 @@ public class SlowSaveAll
                 chunkIdx = 0;
             }
         }
+    }
+    @NetworkCheckHandler
+    public boolean netCheckHandler(Map<String, String> mods, Side side) {
+        return true;
     }
 }
