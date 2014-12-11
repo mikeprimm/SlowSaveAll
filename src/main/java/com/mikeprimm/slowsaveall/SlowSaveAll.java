@@ -53,10 +53,7 @@ public class SlowSaveAll
     
     public boolean tickregistered = false;
     private TickHandler handler = new TickHandler();
-    private Method saveChunk = null;
-    private Method extraSaveChunkData = null;
     private Method saveLevel = null;
-    private Method writePlayerData = null;
     
     public static void crash(Exception x, String msg) {
         CrashReport crashreport = CrashReport.makeCrashReport(x, msg);
@@ -99,22 +96,16 @@ public class SlowSaveAll
             crash("preInit failed - aborting load()");
             return;
         }
-        Class<?> cls = ChunkProviderServer.class;
         try {
-            saveLevel = WorldServer.class.getMethod("func_73042_a", new Class[0]);
+            saveLevel = WorldServer.class.getDeclaredMethod("func_73042_a", new Class[0]);
             saveLevel.setAccessible(true);
-            extraSaveChunkData = cls.getMethod("func_73243_a", new Class[] { Chunk.class });
-            extraSaveChunkData.setAccessible(true);
-            saveChunk = cls.getMethod("func_73242_b", new Class[] { Chunk.class });
-            saveChunk.setAccessible(true);
-            writePlayerData = ServerConfigurationManager.class.getMethod("func_72391_b", new Class[] { EntityPlayerMP.class });
-            writePlayerData.setAccessible(true);
         } catch (SecurityException e) {
         } catch (NoSuchMethodException e) {
         }
-        if (saveChunk == null) {
-            log.severe("saveChunk method not found - SlowSaveAll disabled");
+        if (saveLevel == null) {
+            log.severe("saveLevel method not found - SlowSaveAll disabled");
         }
+
     }
 
     @EventHandler
@@ -129,7 +120,7 @@ public class SlowSaveAll
     @EventHandler
     public void serverStarted(FMLServerStartedEvent event)
     {
-        if (saveChunk == null) return;
+        if (saveLevel == null) return;
         /* Register tick handler */
         if(!tickregistered) {
             FMLCommonHandler.instance().bus().register(handler);
@@ -148,7 +139,7 @@ public class SlowSaveAll
         }
     }    
     
-    private class TickHandler {
+    public class TickHandler {
         private boolean stopped;
         private int ticksUntilSave;
         private List<WorldServer> worldsToDo;
@@ -201,12 +192,7 @@ public class SlowSaveAll
                         if (!playersToDo.isEmpty()) {   // More to do?
                             EntityPlayerMP p = playersToDo.remove(0);
                             if (scm.playerEntityList.contains(p)) {    // Still in list?
-                                try {
-                                    writePlayerData.invoke(scm, p);
-                                } catch (IllegalArgumentException e) {
-                                } catch (IllegalAccessException e) {
-                                } catch (InvocationTargetException e) {
-                                }
+                                scm.writePlayerData(p);
                             }
                             return;
                         }
@@ -254,15 +240,11 @@ public class SlowSaveAll
             for (int i = 0; (i < chunksPerTick) && (chunkIdx < chunkX.length); chunkIdx++) {
                 if (activeWorld.theChunkProviderServer.chunkExists(chunkX[chunkIdx], chunkZ[chunkIdx])) {   // If still loaded
                     Chunk c = activeWorld.getChunkFromChunkCoords(chunkX[chunkIdx], chunkZ[chunkIdx]);
-                    if ((c != null) && (saveChunk != null) && (c.needsSaving(true))) {
-                        try {
-                            extraSaveChunkData.invoke(activeWorld.theChunkProviderServer, c);
-                            saveChunk.invoke(activeWorld.theChunkProviderServer, c);
-                            chunkCnt++;
-                        } catch (IllegalArgumentException e) {
-                        } catch (IllegalAccessException e) {
-                        } catch (InvocationTargetException e) {
-                        }
+                    if ((c != null) && (c.needsSaving(true))) {
+                        activeWorld.theChunkProviderServer.safeSaveExtraChunkData(c);
+                        activeWorld.theChunkProviderServer.safeSaveChunk(c);
+                        c.isModified = false;
+                        chunkCnt++;
                     }
                     i++;
                 }

@@ -61,4 +61,7 @@ processResources
 jar {
    classifier = "forge-1.7.10"
    destinationDir = project.projectDir
+   manifest {
+        attributes 'FMLAT': 'SlowSaveAll_at.cfg'
+    }
 }
