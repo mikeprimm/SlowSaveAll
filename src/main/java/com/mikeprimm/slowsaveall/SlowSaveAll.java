@@ -50,6 +50,7 @@ public class SlowSaveAll
     public int savePeriod = 600;
     public int chunksPerTick = 20;
     public boolean skipPlayers = false;
+    public boolean quietLog = false;
     
     public boolean tickregistered = false;
     private TickHandler handler = new TickHandler();
@@ -74,6 +75,7 @@ public class SlowSaveAll
             savePeriod = cfg.get("Settings", "savePeriod", 600).getInt();
             chunksPerTick = cfg.get("Settings", "chunksPerTick", 20).getInt();
             skipPlayers = cfg.get("Settings",  "skipPlayers", false).getBoolean(false);
+            quietLog = cfg.get("Settings",  "quietLog", false).getBoolean(false);
             if (chunksPerTick < 1) chunksPerTick = 1;
             if (savePeriod < 60) savePeriod = 60;
             
@@ -92,6 +94,8 @@ public class SlowSaveAll
     @EventHandler
     public void load(FMLInitializationEvent event)
     {
+        log.info("Loading SlowSaveAll v" + Version.VER);
+
         if (!good_init) {
             crash("preInit failed - aborting load()");
             return;
@@ -105,7 +109,6 @@ public class SlowSaveAll
         if (saveLevel == null) {
             log.severe("saveLevel method not found - SlowSaveAll disabled");
         }
-
     }
 
     @EventHandler
@@ -121,6 +124,8 @@ public class SlowSaveAll
     public void serverStarted(FMLServerStartedEvent event)
     {
         if (saveLevel == null) return;
+        log.info("Starting SlowSaveAll v" + Version.VER);
+
         /* Register tick handler */
         if(!tickregistered) {
             FMLCommonHandler.instance().bus().register(handler);
@@ -187,7 +192,9 @@ public class SlowSaveAll
                             for (Object o : scm.playerEntityList) {
                                 playersToDo.add((EntityPlayerMP) o);
                             }
-                            log.info("Saving " + playersToDo.size() + " players");
+                            if (!quietLog) {
+                                log.info("Saving " + playersToDo.size() + " players");
+                            }
                         }
                         if (!playersToDo.isEmpty()) {   // More to do?
                             EntityPlayerMP p = playersToDo.remove(0);
@@ -197,7 +204,9 @@ public class SlowSaveAll
                             return;
                         }
                     }
-                    log.info("Save done");
+                    if (!quietLog) {
+                        log.info("Save done");
+                    }
                     playersToDo = null;
                     worldsToDo = null;
                     ticksUntilSave = savePeriod * 20;   // Reset timer
@@ -220,13 +229,17 @@ public class SlowSaveAll
                         chunkCnt = 0;
                         // And save world data
                         try {
-                            log.info("Saving level data for world '" + activeWorld.getWorldInfo().getWorldName() + "'");
+                            if (!quietLog) {
+                                log.info("Saving level data for world '" + activeWorld.getWorldInfo().getWorldName() + "'");
+                            }
                             saveLevel.invoke(activeWorld, new Object[0]);
                         } catch (IllegalArgumentException e) {
                         } catch (IllegalAccessException e) {
                         } catch (InvocationTargetException e) {
                         }
-                        log.info("Saving chunks for world '" + activeWorld.getWorldInfo().getWorldName() + "'");
+                        if (!quietLog) {
+                            log.info("Saving chunks for world '" + activeWorld.getWorldInfo().getWorldName() + "'");
+                        }
                         return;
                     }
                     else {
@@ -253,7 +266,9 @@ public class SlowSaveAll
             
             if (chunkIdx >= chunkX.length) { // Done?
                 MinecraftForge.EVENT_BUS.post(new WorldEvent.Save(activeWorld));
-                log.info("Save of world '" + activeWorld.getWorldInfo().getWorldName() + "' completed - " + chunkCnt + " saved");
+                if (!quietLog) {
+                    log.info("Save of world '" + activeWorld.getWorldInfo().getWorldName() + "' completed - " + chunkCnt + " saved");
+                }
                 activeWorld = null;
                 chunkX = chunkZ = null;
                 chunkIdx = 0;
