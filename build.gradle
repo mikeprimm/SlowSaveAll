@@ -29,8 +29,8 @@ configFile.withReader {
 version = "${config.SlowSaveAll_version}${config.SlowSaveAll_extversion}"
 group= "com.mikeprimm"
 archivesBaseName = "SlowSaveAll"
-targetCompatibility = '1.6'
-sourceCompatibility = '1.6'
+targetCompatibility = '1.7'
+sourceCompatibility = '1.7'
 ext.buildNumber = System.getenv().BUILD_NUMBER ?: "Dev"
 
 minecraft {
